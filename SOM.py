@@ -13,6 +13,8 @@ import random
 
 df = pd.read_csv("Dataset.csv", header=None)
 data = []
+cluster = []
+color = ['gray', 'yellow', 'green', 'fuchsia', 'hotpink', 'maroon', 'steelblue', 'aqua', 'lime', 'peru']
 
 def getRandom(min, max):
     rand = random.uniform(0, 1)
@@ -34,29 +36,101 @@ tLr = 2
 sigma = 2
 tSigma = 2
 
-#Neuron
-min_data_x = min(df[0])
-min_data_y = min(df[1])
-max_data_x = max(df[0])
-max_data_y = max(df[1])
-neuron = [
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'blue', 'status': 'fixed'}, 
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'black', 'status': 'fixed'},
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'green', 'status': 'fixed'},
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'yellow', 'status': 'fixed'},
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'gray', 'status': 'fixed'},
-    {'x': getRandom(min_data_x, max_data_x), 'y': getRandom(min_data_y, max_data_y), 'color': 'magenta', 'status': 'fixed'}       
-]
+#Normalisasi data
+def normalisasi(data):
+    nmin = {'x': min([n['x'] for n in data]), 'y': min([n['y'] for n in data])}
+    nmax = {'x': max([n['x'] for n in data]), 'y': max([n['y'] for n in data])}
+    for i in data:
+        i['x'] = (i['x'] - nmin['x']) / (nmax['x'] - nmin['x']) 
+        i['y'] = (i['y'] - nmin['y']) / (nmax['y'] - nmin['y']) 
+    return data
 
-# Plotdata awal
+normal = normalisasi(data)
+
+#Neuron
+neuron = []
+neuron_size = 1200
+for i in range(neuron_size):
+    neuron.append({'x': random.uniform(0, 1), 'y': random.uniform(0, 1), 'color': 'blue', 'status': 'fixed'})
+
 fig, ax = plt.subplots()
-for i in data:
-    ax.plot(i['x'], i['y'], ".", color=i['color'])
 for i in neuron:
-    ax.plot(i['x'], i['y'], "s", color=i['color'])
+    ax.plot(i['x'], i['y'], ".", color=i['color'])
+for i in normal:
+    ax.plot(i['x'], i['y'], ".", color=i['color'])
+
 
 ax.set(xlabel='x', ylabel='y', title='Mapping Data Awal')
 ax.grid()
-plt.axis([2,19,2,19])
+plt.axis([-0.1,1.1,-0.1,1.1])
 plt.show()
 
+iterasi = 100
+konvergen = 0.00000001
+for t in range(iterasi):
+    #inisialisasi input secara random sebagai neighboor
+    rand = random.randint(1, len(data)-1)
+    x = data[rand]
+    
+    #mencari win neuron
+    win_neuron = neuron[0]
+    for a in neuron:
+        a['status'] = 'neuron'
+        if eucledian(x, a) < eucledian(x, win_neuron): win_neuron = a
+    
+    #mencari tetangga win neuron
+    for b in neuron:
+        if eucledian(b, win_neuron) < sigma:
+            b['status'] = 'neighborhood'
+    
+    #update weigh untuk set
+    for c in neuron:
+        if (c['status'] == 'neighborhood'):
+            s = eucledian(win_neuron, c)
+            phi = np.exp(-(s**2 / (2*sigma**2)))
+            dWeight = lr * phi * eucledian(x, c)
+            c['x'] += dWeight
+            c['y'] += dWeight
+            
+    #cek konvergen
+    if (dWeight < konvergen):
+        print("iterasi: ",t)
+        break
+    
+    #jika tidak konvergen, tambah cluster
+    if (win_neuron not in cluster): cluster.append(win_neuron)
+    
+    #kalau tidak konvergen, update lr dan sigma
+    lr *= np.exp(-t/tLr)
+    tSigma *= np.exp(-t/tSigma)
+
+
+#menentukan warna cluster
+for i in range(len(cluster)):
+    cluster[i]['color'] = color[i]
+    
+
+#Menentukan cluster dataset
+for d in normal:
+    win_cluster = cluster[0]
+    for klaster in cluster:
+        if eucledian(d, klaster) < eucledian(d, win_cluster): win_cluster = klaster
+    d['color'] = win_cluster['color']
+    #if (d['color'] not in cluster): cluster.append(d['color'])
+    
+
+#print('cluster = ', len(cluster))
+
+#Plot data akhir
+
+print("Jumlah cluster: ", len(cluster))
+
+fig, ax = plt.subplots()
+for i in normal:
+    ax.plot(i['x'], i['y'], ".", color=i['color'])
+
+
+ax.set(xlabel='x', ylabel='y', title='Mapping Data Akhir')
+ax.grid()
+plt.axis([-0.1,1.1,-0.1,1.1])
+plt.show()
